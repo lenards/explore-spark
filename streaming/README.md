@@ -49,6 +49,20 @@ drwxrwxrwx   - andrewlenards staff          0 2014-10-27 14:21 /chkpt/922b180f-3
 drwxrwxrwx   - andrewlenards staff          0 2014-10-28 15:15 /chkpt/d87d4db8-db0d-4416-b0c5-f71df379a185
 ```
 
+$ ./bin/dse hadoop fs -ls cfs://127.0.0.1/measures/
+objc[69468]: Class JavaLaunchHelper is implemented in both /Library/Java/JavaVirtualMachines/jdk1.7.0_67.jdk/Contents/Home/bin/java and /Library/Java/JavaVirtualMachines/jdk1.7.0_67.jdk/Contents/Home/jre/lib/libinstrument.dylib. One of the two will be used. Which one is undefined.
+14/10/28 16:46:12 INFO snitch.Workload: Setting my workload to Cassandra
+
+### C* Schema
+
+``schema.cql``;
+
+```
+cqlsh> SOURCE '~/tmp/explore-spark/streaming/schema.cql';
+cqlsh> USE ts_data;
+cqlsh:ts_data> SELECT * FROM measurements;
+```
+
 ## Building
 
 ```
