@@ -1,6 +1,6 @@
 # Cassandra Schema Evolution with Spark
 
-## Problem
+## Problem Statement *(pick one to focus on)*
 
 ### Option 1
 
@@ -69,8 +69,9 @@ The fourth step is easily stated but may not be straightforward in execution as 
 
 ## Working with Spark
 
+We'll want to create types that model our source and target tables along with a function that can convert from the source to the target.
 
-### case classes to represent tables
+### Defining case classes to represent tables
 
 ```scala
 
@@ -86,14 +87,74 @@ case class ReadingsByMonthHour(arrayId: UUID, arrayName: String,
                                measuredAt: Date, value: Float, unit: String)
 ```
 
-file:///Users/andrewlenards/devel/ghf/spark-cassandra-connector/spark-cassandra-connector/target/scala-2.10/api/index.html#com.datastax.spark.connector.rdd.CassandraRDD
+### Creating a conversion function
+
+```scala
+    def convertTo(in: ReadingsByMonth): ReadingsByMonthHour = {
+        // Change date to only have hours time component
+        var cal = Calendar.getInstance()
+        cal.setTime(in.measuredAt)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MINUTE, 0)
+
+        return ReadingsByMonthHour(in.arrayId, in.arrayName, cal.getTime,
+                                   in.sensor, in.measuredAt, in.value, in.unit,
+                                   in.location)
+    }
+```
+
+Just to quick review of our logic. We're splitting up the wide rows from our source table by including a date with only the *year, month, and hour* components for the *timestamp*. This will limit the number of rows within the partition to a more management amount.
+
+Again, we can choose the granularity of the values contained in a partition by altering the resolution of the time component in our composite partition key.
+
+### Putting it all together
+
+With the DataStax Spark Cassandra Connector, we can create a Resiliant Distributed Data (RDD) that represents the data within our source table (``readings_by_month``). Then, we just ``map`` the conversation function over that dataset and we can save the results back to Cassandra with the ``saveToCassandra`` function (this function is added to RDDs when you ``import com.datastax.spark.connect._``).
+
+Let's look at the ``main`` method:
+```scala
+    def main(args: Array[String]) {
+        val conf = new SparkConf(true)
+                    .set("spark.cassandra.connection.host", "127.0.0.1")
+                    .setAppName("Schema Evolution Spark App")
+        val sc = new SparkContext(conf)
+
+        val tableData = sc.cassandraTable[ReadingsByMonth]("ts_data", "readings_by_month")
+        val transformed = tableData.map(convertTo)
+        transformed.saveToCassandra("ts_data", "reading_by_month_hour", )
+
+        println("Done...")
+
+        sc.stop()
+    }
+```
+
+### Tuning for large datasets
 
 input setting, number of partitions to fetch at a time - number of rows to fetch at a time...
 
-CassandraRDD divides the dataset into smaller partitions, processed locally on every cluster node. A data partition consists of one or more contiguous token ranges. To reduce the number of roundtrips to Cassandra, every partition is fetched in batches. The following properties control the number of partitions and the fetch size:
+#### Reading from Cassandra
 
-- spark.cassandra.input.split.size: approx number of Cassandra partitions in a Spark partition, default 100000
-- spark.cassandra.input.page.row.size: number of CQL rows fetched per roundtrip, default 1000
+file:///Users/andrewlenards/devel/ghf/spark-cassandra-connector/spark-cassandra-connector/target/scala-2.10/api/index.html#com.datastax.spark.connector.rdd.CassandraRDD
+
+> CassandraRDD divides the dataset into smaller partitions, processed locally on every cluster
+> node. A data partition consists of one or more contiguous token ranges. To reduce the number
+> of roundtrips to Cassandra, every partition is fetched in batches. The following properties
+> control the number of partitions and the fetch size:
+>
+> - `spark.cassandra.input.split.size`: approx number of Cassandra partitions in a Spark partition, default 100000
+> - `spark.cassandra.input.page.row.size`: number of CQL rows fetched per roundtrip, default 1000
+
+
+If we do nothing, we're reading the data at ``LOCAL_ONE``, this likely is not desirable. We should show how to change that ...
+
+#### Writing to Cassandra
+
+You can pass an instance of ``WriteConf`` to ``saveToCassandra`` which allows you to set the ``batchSize``, ``consistencyLevel``, and ``parallelismLevel``
+
+columns .. AllColumns - should is just a companion object, can simply be passed
+WriteConf - want to change from ConsistencyLevel.LOCAL_ONE to LOCAL_QUORUM
+
 
 
 
