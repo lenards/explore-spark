@@ -19,8 +19,8 @@ We know that will increase the number of values per partition so we'd like to mo
 1. Analyze possible columns to add to partition key, thus reducing values
 2. Create a table with that new partition key
 3. Change driver to write to both old & new table
-4. Bulk move data from old table into the new table (run as background, batch job)
-5. Wait for move to complete
+4. **Bulk move data from old table into the new table** (run as background, batch job)
+5. Wait for execution of bulk move to complete
 6. Change driver to write to *only* new table
 7. Truncate old table, drop old table
 8. Run `nodetool cleanup` on cluster
@@ -49,7 +49,7 @@ We're splitting the partition from containing all readings for a *year/month* do
 
 #### New (target) table:
 ```
-CREATE TABLE reading_by_month_hour (
+CREATE TABLE readings_by_month_hour (
     array_id uuid,
     array_name text static,
     month_hour timestamp,
@@ -82,10 +82,37 @@ We'll want to create types that model our source and target tables along with a 
 import java.util.Date
 import java.util.UUID
 
+/*
+    CREATE TABLE readings_by_month (
+        array_id uuid,
+        array_name text static,
+        year int,
+        month int,
+        sensor text,
+        measured_at timestamp,
+        value float,
+        unit text,
+        location text,
+        PRIMARY KEY ((array_id, year, month), sensor, measured_at)
+    ) WITH CLUSTERING ORDER BY (sensor ASC, measured_at DESC);
+*/
 case class ReadingsByMonth(arrayId: UUID, arrayName: String, year: Int,
                            month: Int, sensor: String, measuredAt: Date,
                            value: Float, unit: String)
 
+/*
+    CREATE TABLE readings_by_month_hour (
+        array_id uuid,
+        array_name text static,
+        month_hour timestamp,
+        sensor text,
+        measured_at timestamp,
+        value float,
+        unit text,
+        location text,
+        PRIMARY KEY ((array_id, month_hour), sensor, measured_at)
+    ) WITH CLUSTERING ORDER BY (sensor ASC, measured_at DESC);
+*/
 case class ReadingsByMonthHour(arrayId: UUID, arrayName: String,
                                monthHour: Date, sensor: String,
                                measuredAt: Date, value: Float, unit: String)
