@@ -148,6 +148,13 @@ file:///Users/andrewlenards/devel/ghf/spark-cassandra-connector/spark-cassandra-
 
 If we do nothing, we're reading the data at ``LOCAL_ONE``, this likely is not desirable. We should show how to change that ...
 
+> By default, reads are performed at ConsistencyLevel.LOCAL_ONE in order to leverage
+> data-locality and minimize network traffic. This read consistency level is controlled by
+> the following property:
+>
+> - `spark.cassandra.input.consistency.level`: consistency level for RDD reads, string matching
+> the ConsistencyLevel enum name.
+
 #### Writing to Cassandra
 
 You can pass an instance of ``WriteConf`` to ``saveToCassandra`` which allows you to set the ``batchSize``, ``consistencyLevel``, and ``parallelismLevel``
