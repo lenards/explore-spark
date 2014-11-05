@@ -25,9 +25,11 @@ We know that will increase the number of values per partition so we'd like to mo
 7. Truncate old table, drop old table
 8. Run `nodetool cleanup` on cluster
 
-### Old & New
+### Schema - Old & New / Source & Target
 
-#### Initial table:
+**Background:** we have an array of sensors that provide readings that are stored in Cassandra. Each array has an indentifier along with a friendly name. The readings for a sensor are floating point values and measured at a particularly point in time. We include the *units* the *value* is measured in as a separate field.
+
+#### Initial (source) table:
 ```
 CREATE TABLE readings_by_month (
     array_id uuid,
@@ -43,7 +45,9 @@ CREATE TABLE readings_by_month (
 ) WITH CLUSTERING ORDER BY (sensor ASC, measured_at DESC);
 ```
 
-#### New table:
+We're splitting the partition from containing all readings for a *year/month* down to *year/month/hour*.
+
+#### New (target) table:
 ```
 CREATE TABLE reading_by_month_hour (
     array_id uuid,
