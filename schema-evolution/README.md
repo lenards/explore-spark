@@ -133,10 +133,18 @@ Let's look at the ``main`` method:
 
 input setting, number of partitions to fetch at a time - number of rows to fetch at a time...
 
+... ensuring we're reading & writing at the correct consistency level...
+
 #### Reading from Cassandra
 
 file:///Users/andrewlenards/devel/ghf/spark-cassandra-connector/spark-cassandra-connector/target/scala-2.10/api/index.html#com.datastax.spark.connector.rdd.CassandraRDD
 
+Excerpt from documentation:
+> Configuration properties should be passed in the SparkConf configuration of SparkContext.
+> CassandraRDD needs to open connection to Cassandra, therefore it requires appropriate
+> connection property values to be present in SparkConf. For the list of required and
+> available properties, see CassandraConnector.
+>
 > CassandraRDD divides the dataset into smaller partitions, processed locally on every cluster
 > node. A data partition consists of one or more contiguous token ranges. To reduce the number
 > of roundtrips to Cassandra, every partition is fetched in batches. The following properties
