@@ -1,5 +1,7 @@
 # Cassandra Schema Evolution with Spark
 
+Best practices in data modeling for [Cassandra](http://cassandra.apache.org/) often lead to a "table per query" and new or different queries needed to be supported the schema of an existing system will need to evolve. This is short discussion about how you might evolve a time-series schema using the [Apache Spark™](http://spark.apache.org/) with the DataStax [Spark Cassandra Connector](https://github.com/datastax/spark-cassandra-connector)
+
 ## Problem Statement *(pick one to focus on)*
 
 ### Option 1
