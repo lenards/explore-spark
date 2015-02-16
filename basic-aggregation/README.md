@@ -87,24 +87,51 @@ scala> rollup1.first()
 res5: ((String, String, String), (Float, Int)) = ((2015-02-13_12,PBH,TraderY),(39.37,700))
 ```
 
+Instinct would say we'd want to group-by-key and then do an aggregation. In Spark, we have want to make use of the most efficient operations. For PairRDDs, we can do `combineByKey` and `reduceByKey` operations that will reduce the number of "shuffles" across the network. In general, we want to avoid using `groupByKey` if we're just going to [aggregate what we've grouped together](http://spark.apache.org/docs/1.2.0/programming-guide.html#transformations). 
+
+So, `combineByKey` is chosen here because we want to operate on tuple in-place. 
 
 ```
-scala> val rollup2 = rollup1.combineByKey((metrics) => (metrics._1 * metrics._2, metrics._2), 
+scala> val rollup2 = rollup1.combineByKey(
+     |        (metrics) => (metrics._1 * metrics._2, metrics._2), 
      |        (t:(Float,Int), r:(Float,Int)) => (t._1 + r._1, t._2 + r._2),
-     |        (lhs:(Float,Int), rhs:(Float,Int)) => (lhs._1 + rhs._1, lhs._2 + rhs._2)
+     |        (lhs:(Float,Int), rhs:(Float,Int)) => 
+     |                                   (lhs._1 + rhs._1, lhs._2 + rhs._2)
      | )
 rollup2: org.apache.spark.rdd.RDD[((String, String, String), (Float, Int))] = ShuffledRDD[2] at combineByKey at <console>:63
 ```
+
+The transformation `combineByKey` takes the 3 arguments: 
+
+* createCombiner
+* mergeValue
+* mergeCombiner
+
+With the first argument, we're producing the first value for combining. Then, we're merging values. Finally, we're doing the combiner merge. 
+
+There are [some examples](There are some ) out there in Python using `combineByKey` as well
+
+The elements of the `rollup2` RDD are in the form: 
+
+```
+((String, String, String), (Float, Int))
+```
+
+To save to Cassandra, the RDD either needs to be in tuple form (with field position to column name mapping via ``SomeColumns``) or a ``case class`` (that has field names that match the CQL table). So we'll take the current tuple and map over it as translation to prepare to persist this to Cassandra.
 
 ```
 scala> val rollup3 = rollup2.map { r => (r._1._1, r._1._2, r._1._3, r._2._1, r._2._2) }
 rollup3: org.apache.spark.rdd.RDD[(String, String, String, Float, Int)] = MappedRDD[3] at map at <console>:65
 ```
 
+We can verify that we're looking good by triggering the computation with an action (we're using ``first``):
+
 ```
 scala> rollup3.first()
 res6: (String, String, String, Float, Int) = (2015-02-13_10,PBH,TraderZ,5912.9995,150)
 ```
+
+For known-small datasets (datasets that won't overwhelm the REPL), we can ``collect`` and then print them out for visual inspection (if desired):
 
 ```
 scala> rollup3.collect.foreach(println)
@@ -114,6 +141,8 @@ scala> rollup3.collect.foreach(println)
 (2015-02-13_10,CHD,TraderX,81235.49,3670)
 ....
 ```
+
+Again, we can look at the schema of the target CQL table:
 
 ```
 scala> :showSchema ticker tick_rollup_by_datehour
@@ -129,9 +158,50 @@ scala> :showSchema ticker tick_rollup_by_datehour
  - total_trade_amt : Float 
 ```
 
+Now, we just need to provide that "positional field to column name mapping":
+
 ```
-scala> rollup3.saveToCassandra("ticker", "tick_rollup_by_datehour", SomeColumns("date_hour", "ticker_symbol", 
-     |   "trade_agent", "total_cost", "total_trade_amt"))
+scala> rollup3.saveToCassandra("ticker", "tick_rollup_by_datehour", 
+     |         SomeColumns("date_hour", "ticker_symbol", 
+     |                     "trade_agent", "total_cost", "total_trade_amt"))
 ```
 
-## A Packaged Application
+And, we can verify with `cqlsh` that we've persisted the data:
+
+```
+cqlsh:ticker> select * from tick_rollup_by_datehour 
+          ... ; 
+
+ date_hour     | ticker_symbol | trade_agent | total_cost | total_trade_amt
+---------------+---------------+-------------+------------+-----------------
+ 2015-02-13_10 |            CL |     TraderR |      22271 |             420
+ 2015-02-13_10 |            CL |     TraderX |      17422 |             350
+ 2015-02-13_10 |            CL |     TraderY |      13947 |             300
+ 2015-02-13_10 |            CL |     TraderZ |      30597 |             540
+ 2015-02-13_13 |            CL |     TraderR |      22340 |             740
+ 2015-02-13_13 |            CL |     TraderX |      17491 |             600
+ 2015-02-13_13 |            CL |     TraderY |      14017 |             500
+ 2015-02-13_13 |            CL |     TraderZ |      30666 |             980
+ 2015-02-13_12 |           PBH |     TraderX |     5899.5 |             150
+ 2015-02-13_12 |           PBH |     TraderY |      27559 |             700
+ 2015-02-13_12 |           PBH |     TraderZ |     9837.5 |             250
+ 2015-02-13_13 |           PBH |     TraderR |      17698 |             450
+ 2015-02-13_13 |           PBH |     TraderX |      27953 |             710
+ 2015-02-13_13 |           PBH |     TraderY |      19680 |             500
+ 2015-02-13_13 |           PBH |     TraderZ |      25565 |             650
+ 2015-02-13_09 |           PBH |     TraderR |     9931.3 |             750
+ 2015-02-13_09 |           PBH |     TraderX |     6175.2 |            1050
+ 2015-02-13_09 |           PBH |     TraderY |      27756 |            3400
+ 2015-02-13_09 |           PBH |     TraderZ |     6317.5 |            3350
+ 2015-02-13_10 |           PBH |     TraderY |      19700 |             500
+ 2015-02-13_10 |           PBH |     TraderZ |       5913 |             150
+ 2015-02-13_11 |           PBH |     TraderX |     4009.8 |             450
+ 2015-02-13_11 |           PBH |     TraderY |      19690 |             500
+ 2015-02-13_11 |           PBH |     TraderZ |     5937.4 |             800
+ 2015-02-13_10 |           CHD |     TraderR |     9429.8 |            1940
+ 2015-02-13_10 |           CHD |     TraderX |      81235 |            3670
+ 2015-02-13_10 |           CHD |     TraderY |      71217 |            2290
+ 2015-02-13_10 |           CHD |     TraderZ |      21123 |            1600
+
+(28 rows)
+```
