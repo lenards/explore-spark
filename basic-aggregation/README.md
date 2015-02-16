@@ -205,3 +205,74 @@ cqlsh:ticker> select * from tick_rollup_by_datehour
 
 (28 rows)
 ```
+
+## A Package Application 
+
+```
+$ sbt clean package
+```
+
+The output should like something like this:
+
+```
+$ sbt clean package 
+[info] Set current project to Basic Aggregation Project (in build file:/Users/andrewlenards/tmp/explore-spark/basic-aggregation/)
+[success] Total time: 0 s, completed Feb 16, 2015 1:26:57 PM
+[info] Updating {file:/Users/andrewlenards/tmp/explore-spark/basic-aggregation/}basic-aggregation...
+[info] Resolving org.fusesource.jansi#jansi;1.4 ...
+[info] Done updating.
+[info] Compiling 1 Scala source to /Users/andrewlenards/tmp/explore-spark/basic-aggregation/target/scala-2.10/classes...
+[info] Packaging /Users/andrewlenards/tmp/explore-spark/basic-aggregation/target/scala-2.10/basic-aggregation-project_2.10-0.1.jar ...
+[info] Done packaging.
+[success] Total time: 7 s, completed Feb 16, 2015 1:27:03 PM
+
+```
+
+Now that we have a packaged jar, we can use `dse spark-submit` \[[for more information](http://www.datastax.com/documentation/datastax_enterprise/4.6/datastax_enterprise/spark/sparkStart.html?scroll=sparkStart__dseSparkSubmit)\]:
+
+```
+$ dse spark-submit --class TickerAgg ./target/scala-2.10/basic-aggregation-project_2.10-0.1.jar 
+... 
+Saving to Cassandra...
+Saving complete.
+```
+
+Verify that the data was persisted to Cassandra: 
+
+```
+cqlsh:ticker> select * from tick_rollup_by_datehour ;
+
+ date_hour     | ticker_symbol | trade_agent | total_cost | total_trade_amt
+---------------+---------------+-------------+------------+-----------------
+ 2015-02-13_10 |            CL |     TraderR |      22271 |             420
+ 2015-02-13_10 |            CL |     TraderX |      17422 |             350
+ 2015-02-13_10 |            CL |     TraderY |      13947 |             300
+ 2015-02-13_10 |            CL |     TraderZ |      30597 |             540
+ 2015-02-13_13 |            CL |     TraderR |      22340 |             740
+ 2015-02-13_13 |            CL |     TraderX |      17491 |             600
+ 2015-02-13_13 |            CL |     TraderY |      14017 |             500
+ 2015-02-13_13 |            CL |     TraderZ |      30666 |             980
+ 2015-02-13_12 |           PBH |     TraderX |     5899.5 |             150
+ 2015-02-13_12 |           PBH |     TraderY |      27559 |             700
+ 2015-02-13_12 |           PBH |     TraderZ |     9837.5 |             250
+ 2015-02-13_13 |           PBH |     TraderR |      17698 |             450
+ 2015-02-13_13 |           PBH |     TraderX |      27953 |             710
+ 2015-02-13_13 |           PBH |     TraderY |      19680 |             500
+ 2015-02-13_13 |           PBH |     TraderZ |      25565 |             650
+ 2015-02-13_09 |           PBH |     TraderR |     9931.3 |             750
+ 2015-02-13_09 |           PBH |     TraderX |     6175.2 |            1050
+ 2015-02-13_09 |           PBH |     TraderY |      27756 |            3400
+ 2015-02-13_09 |           PBH |     TraderZ |     6317.5 |            3350
+ 2015-02-13_10 |           PBH |     TraderY |      19700 |             500
+ 2015-02-13_10 |           PBH |     TraderZ |       5913 |             150
+ 2015-02-13_11 |           PBH |     TraderX |     4009.8 |             450
+ 2015-02-13_11 |           PBH |     TraderY |      19690 |             500
+ 2015-02-13_11 |           PBH |     TraderZ |     5937.4 |             800
+ 2015-02-13_10 |           CHD |     TraderR |     9429.8 |            1940
+ 2015-02-13_10 |           CHD |     TraderX |      81235 |            3670
+ 2015-02-13_10 |           CHD |     TraderY |      71217 |            2290
+ 2015-02-13_10 |           CHD |     TraderZ |      21123 |            1600
+
+(28 rows)
+
+```
