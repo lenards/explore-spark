@@ -73,6 +73,12 @@ object Stream {
         val ssc = new StreamingContext(sc, Seconds(5))
         ssc.checkpoint(checkpointDir)
 
+        sys.ShutdownHookThread {
+            log.info("Gracefully stopping Spark Streaming Application")
+            ssc.stop(true, true)
+            log.info("Application stopped")
+        }
+
         // setup our DStream - use a file directory as source
         val lines = ssc.textFileStream("/measures")
 
